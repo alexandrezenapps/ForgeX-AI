@@ -1,10 +1,11 @@
 import * as React from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { EXERCISES } from '../constants';
-import { Check, X, Play, Pause, RotateCcw, ChevronRight, ChevronLeft, Info, HelpCircle, Filter, Plus, Trophy, Flame, MessageSquare, Dumbbell, Hash, Save, FolderOpen, Trash2, Video, Sparkles } from 'lucide-react';
+import { DEFAULT_TEMPLATES, EXERCISES } from '../constants';
+import { Check, X, Play, Pause, RotateCcw, ChevronRight, ChevronLeft, Info, HelpCircle, Filter, Plus, Trophy, Flame, MessageSquare, Dumbbell, Hash, Save, FolderOpen, Trash2, Video, Sparkles, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UserProfile, Exercise, WorkoutTemplate } from '../types';
+import { UserProfile, Exercise, WorkoutTemplate, MuscleGroup } from '../types';
+import { updateFatigueAfterWorkout } from '../lib/fatigue';
 import { useI18n } from '../i18n';
 
 interface WorkoutScreenProps {
@@ -42,7 +43,8 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
   const [workoutData, setWorkoutData] = React.useState<Record<string, Record<number, { reps: number, weight: number, notes: string }>>>({});
   const [templates, setTemplates] = React.useState<WorkoutTemplate[]>(() => {
     const saved = localStorage.getItem('workout_templates');
-    return saved ? JSON.parse(saved) : [];
+    const custom = saved ? JSON.parse(saved) : [];
+    return [...DEFAULT_TEMPLATES, ...custom];
   });
   const [isTemplateModalOpen, setIsTemplateModalOpen] = React.useState(false);
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = React.useState(false);
@@ -50,13 +52,34 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
   const [restTimer, setRestTimer] = React.useState(0);
   const [isResting, setIsResting] = React.useState(false);
   const [customRestTime, setCustomRestTime] = React.useState<Record<string, number>>({});
+  const [currentSessionTemplate, setCurrentSessionTemplate] = React.useState<WorkoutTemplate | null>(null);
 
   const allExercises = React.useMemo(() => [...EXERCISES, ...customExercises], [customExercises]);
+  
+  const currentProfile = React.useMemo(() => {
+    return user.equipmentProfiles?.find(p => p.id === user.currentProfileId);
+  }, [user.equipmentProfiles, user.currentProfileId]);
 
   const filteredExercises = React.useMemo(() => {
-    if (difficultyFilter === 'All') return allExercises;
-    return allExercises.filter(ex => ex.difficulty === difficultyFilter);
-  }, [difficultyFilter, allExercises]);
+    let list = allExercises;
+    
+    // Filter by difficulty
+    if (difficultyFilter !== 'All') {
+      list = list.filter(ex => ex.difficulty === difficultyFilter);
+    }
+
+    // Filter by equipment profile
+    if (currentProfile) {
+      list = list.filter(ex => {
+        // If exercise has no equipment requirements or is bodyweight, it's always available
+        if (!ex.equipment || ex.equipment.length === 0 || ex.equipment.includes('Bodyweight')) return true;
+        // Check if all required equipment for the exercise is in the profile
+        return ex.equipment.every(eq => currentProfile.equipment.includes(eq));
+      });
+    }
+
+    return list;
+  }, [difficultyFilter, allExercises, currentProfile]);
 
   const activeExercise = React.useMemo(() => {
     const base = filteredExercises[activeExerciseIndex];
@@ -190,11 +213,39 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
       if (!completedSets.includes(currentSet)) {
         setCompletedSets([...completedSets, currentSet]);
         
+        // Check for superset
+        const templateExercise = currentSessionTemplate?.exercises.find(ex => ex.exerciseId === activeExercise.id);
+        const supersetWithId = templateExercise?.supersetWith;
+
+        if (supersetWithId) {
+          // Move to next exercise in superset immediately
+          const nextIdx = filteredExercises.findIndex(ex => ex.id === supersetWithId);
+          if (nextIdx !== -1) {
+            setActiveExerciseIndex(nextIdx);
+            // We stay on the same set number for the superset partner
+            return;
+          }
+        }
+
+        // If we just finished the second part of a superset, or it's a normal exercise
+        const isPartOfSuperset = currentSessionTemplate?.exercises.some(ex => ex.supersetWith === activeExercise.id);
+        
         // Start rest timer
         const restTime = customRestTime[activeExercise.id] ?? activeExercise.defaultRestTime ?? 60;
         if (restTime > 0) {
           setRestTimer(restTime);
           setIsResting(true);
+        }
+
+        if (isPartOfSuperset) {
+          // Move back to the first exercise of the superset for the next set
+          const firstEx = currentSessionTemplate?.exercises.find(ex => ex.supersetWith === activeExercise.id);
+          if (firstEx) {
+            const firstIdx = filteredExercises.findIndex(ex => ex.id === firstEx.exerciseId);
+            if (firstIdx !== -1) {
+              setActiveExerciseIndex(firstIdx);
+            }
+          }
         }
 
         if (currentSet < 4) {
@@ -212,11 +263,36 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
     setIsFinished(true);
     setIsActive(false);
 
+    // Calculate muscles worked
+    const musclesWorked: Record<string, number> = {};
+    Object.keys(workoutData).forEach(exerciseId => {
+      const exercise = EXERCISES.find(ex => ex.id === exerciseId);
+      if (exercise) {
+        const setsCount = Object.keys(workoutData[exerciseId]).length;
+        const muscle = exercise.category as MuscleGroup;
+        musclesWorked[muscle] = (musclesWorked[muscle] || 0) + setsCount;
+      }
+    });
+
+    // Update challenges
+    const updatedChallenges = user.challenges?.map(challenge => {
+      if (challenge.type === 'workouts' && !challenge.completed) {
+        const newCurrent = challenge.current + 1;
+        return {
+          ...challenge,
+          current: newCurrent,
+          completed: newCurrent >= challenge.target
+        };
+      }
+      return challenge;
+    });
+
     const updatedUser: UserProfile = {
       ...user,
       points: user.points + points,
       xp: user.xp + xp,
       streak: user.streak + 1, // Simple streak increment for demo
+      challenges: updatedChallenges
     };
 
     // Check for level up
@@ -232,7 +308,9 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
       updatedUser.tier = tiers[currentTierIndex + 1];
     }
 
-    onUpdateUser(updatedUser);
+    const finalUser = updateFatigueAfterWorkout(updatedUser, musclesWorked);
+
+    onUpdateUser(finalUser);
   };
 
   const nextExercise = () => {
@@ -277,7 +355,15 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
       });
     });
     setWorkoutData(newWorkoutData);
-    setActiveExerciseIndex(0);
+    setCurrentSessionTemplate(template);
+    
+    // Find index of first exercise in filtered list
+    const firstExId = template.exercises[0].exerciseId;
+    const firstIdx = filteredExercises.findIndex(ex => ex.id === firstExId);
+    if (firstIdx !== -1) {
+      setActiveExerciseIndex(firstIdx);
+    }
+    
     setCurrentSet(1);
     setCompletedSets([]);
     setIsTemplateModalOpen(false);
@@ -347,8 +433,9 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              className="relative overflow-hidden"
             >
-              <Card className="flex items-center justify-between p-6 border-accent neon-glow">
+              <Card className="flex items-center justify-between p-6 border-accent neon-glow relative z-10">
                 <div className="space-y-1">
                   <span className="text-[10px] font-mono uppercase tracking-widest text-accent">{t.restTimer}</span>
                   <h2 className="text-4xl font-black font-mono tracking-tighter text-accent">{formatTime(restTimer)}</h2>
@@ -362,6 +449,12 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
                   {t.skipRest}
                 </Button>
               </Card>
+              <motion.div 
+                className="absolute bottom-0 left-0 h-1 bg-accent/30 z-20"
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: restTimer, ease: 'linear' }}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -370,9 +463,17 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
       {/* Difficulty Filter */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-2">
-          <div className="flex items-center gap-2">
-            <Filter className="w-3 h-3 text-white/40" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">{t.difficulty}</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-3 h-3 text-white/40" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">{t.difficulty}</span>
+            </div>
+            {currentProfile && (
+              <div className="flex items-center gap-2 px-2 py-0.5 bg-accent/10 rounded-full border border-accent/20">
+                <Dumbbell className="w-3 h-3 text-accent" />
+                <span className="text-[8px] font-mono font-bold uppercase tracking-widest text-accent">{currentProfile.name}</span>
+              </div>
+            )}
           </div>
           <Button 
             variant="ghost" 
@@ -437,7 +538,28 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
               </div>
               <div className="p-6 space-y-2">
                 <div className="flex justify-between items-start">
-                  <h3 className="text-2xl font-black uppercase tracking-tight">{activeExercise.name}</h3>
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-black uppercase tracking-tight">{activeExercise.name}</h3>
+                    {currentSessionTemplate?.exercises.find(ex => ex.exerciseId === activeExercise.id)?.supersetWith && (
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-accent-secondary text-white text-[8px] font-bold uppercase tracking-widest border border-accent-secondary/20 flex items-center gap-1">
+                          <Zap className="w-2 h-2" />
+                          {t.superset}
+                        </span>
+                        <span className="text-[8px] font-mono uppercase tracking-widest text-white/40">
+                          {t.nextExerciseInSuperset}: {EXERCISES.find(ex => ex.id === currentSessionTemplate?.exercises.find(e => e.exerciseId === activeExercise.id)?.supersetWith)?.name}
+                        </span>
+                      </div>
+                    )}
+                    {currentSessionTemplate?.exercises.some(ex => ex.supersetWith === activeExercise.id) && (
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-accent-secondary text-white text-[8px] font-bold uppercase tracking-widest border border-accent-secondary/20 flex items-center gap-1">
+                          <Zap className="w-2 h-2" />
+                          {t.superset} (Part 2)
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   {activeExercise.videoUrl && (
                     <span className="px-2 py-1 rounded bg-accent/10 text-accent text-[8px] font-bold uppercase tracking-widest border border-accent/20">
                       {t.videoDemo}
@@ -482,22 +604,6 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
               </div>
             </Card>
 
-            {/* Technique Guide */}
-            <Card className="p-4 bg-accent/5 border-accent/10">
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="w-4 h-4 text-accent" />
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">{t.techniqueGuide}</h4>
-              </div>
-              <ul className="space-y-2">
-                {activeExercise.cues.map((cue, i) => (
-                  <li key={i} className="flex gap-3 text-xs text-white/70">
-                    <span className="text-accent font-mono">{i + 1}.</span>
-                    {cue}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-
             {/* Sets Tracking */}
             <div className="grid grid-cols-4 gap-3">
               {[1, 2, 3, 4].map((set) => (
@@ -517,6 +623,22 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
               ))}
             </div>
 
+            {/* Technique Guide */}
+            <Card className="p-4 bg-accent/5 border-accent/10">
+              <div className="flex items-center gap-2 mb-3">
+                <Info className="w-4 h-4 text-accent" />
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">{t.techniqueGuide}</h4>
+              </div>
+              <ul className="space-y-2">
+                {activeExercise.cues.map((cue, i) => (
+                  <li key={i} className="flex gap-3 text-xs text-white/70">
+                    <span className="text-accent font-mono">{i + 1}.</span>
+                    {cue}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
             {/* Set Details Input */}
             <Card className="p-4 space-y-4 bg-white/5 border-white/10">
               <div className="flex items-center gap-2 mb-2">
@@ -532,7 +654,23 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
                   <input
                     type="number"
                     value={currentWeight}
-                    onChange={(e) => setCurrentWeight(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCurrentWeight(val);
+                      if (activeExercise) {
+                        setWorkoutData(prev => ({
+                          ...prev,
+                          [activeExercise.id]: {
+                            ...(prev[activeExercise.id] || {}),
+                            [currentSet]: {
+                              reps: parseInt(currentReps) || 0,
+                              weight: parseFloat(val) || 0,
+                              notes: currentNotes
+                            }
+                          }
+                        }));
+                      }
+                    }}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent transition-colors"
                   />
                 </div>
@@ -543,7 +681,23 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
                   <input
                     type="number"
                     value={currentReps}
-                    onChange={(e) => setCurrentReps(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCurrentReps(val);
+                      if (activeExercise) {
+                        setWorkoutData(prev => ({
+                          ...prev,
+                          [activeExercise.id]: {
+                            ...(prev[activeExercise.id] || {}),
+                            [currentSet]: {
+                              reps: parseInt(val) || 0,
+                              weight: parseFloat(currentWeight) || 0,
+                              notes: currentNotes
+                            }
+                          }
+                        }));
+                      }
+                    }}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent transition-colors"
                   />
                 </div>
@@ -555,7 +709,23 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ user, onUpdateUser
                 </label>
                 <textarea
                   value={currentNotes}
-                  onChange={(e) => setCurrentNotes(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCurrentNotes(val);
+                    if (activeExercise) {
+                      setWorkoutData(prev => ({
+                        ...prev,
+                        [activeExercise.id]: {
+                          ...(prev[activeExercise.id] || {}),
+                          [currentSet]: {
+                            reps: parseInt(currentReps) || 0,
+                            weight: parseFloat(currentWeight) || 0,
+                            notes: val
+                          }
+                        }
+                      }));
+                    }
+                  }}
                   placeholder={t.notesPlaceholder}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent transition-colors h-20 resize-none"
                 />

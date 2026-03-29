@@ -29,7 +29,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 
   const t = useI18n(formData.language);
 
-  const goals: Goal[] = ['Strength', 'Hypertrophy', 'Endurance', 'Fat Loss'];
+  const goals: Goal[] = ['Strength', 'Hypertrophy', 'Endurance', 'Fat Loss', 'Yoga', 'Pilates'];
   const languages: { id: Language; label: string }[] = [
     { id: 'en', label: 'English' },
     { id: 'fr', label: 'Français' },

@@ -19,7 +19,8 @@ const iconMap: Record<string, any> = {
 
 export const BadgesScreen: React.FC<{ user: UserProfile }> = ({ user }) => {
   const t = useI18n(user.language || 'en');
-  const unlockedCount = BADGES.filter(b => b.unlocked).length;
+  const userBadges = user.badges || BADGES;
+  const unlockedCount = userBadges.filter(b => b.unlocked).length;
 
   const tiers = [
     { name: 'Bronze', color: 'text-amber-700', bg: 'bg-amber-700/10', border: 'border-amber-700/20' },
@@ -37,7 +38,7 @@ export const BadgesScreen: React.FC<{ user: UserProfile }> = ({ user }) => {
         <h2 className="text-2xl font-black uppercase tracking-tight italic">{t.hallOfForge}</h2>
         <div className="flex items-center gap-2 px-3 py-1 bg-accent/10 rounded-full border border-accent/20">
           <Award className="w-4 h-4 text-accent" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-accent">{unlockedCount}/{BADGES.length} {t.badges}</span>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-accent">{unlockedCount}/{userBadges.length} {t.badges}</span>
         </div>
       </div>
 
@@ -57,7 +58,7 @@ export const BadgesScreen: React.FC<{ user: UserProfile }> = ({ user }) => {
       </Card>
 
       <div className="grid grid-cols-2 gap-4">
-        {BADGES.map((badge, i) => {
+        {userBadges.map((badge, i) => {
           const Icon = iconMap[badge.icon] || Award;
           const badgeNameKey = badge.name.toLowerCase().replace(/\s+/g, '') as keyof typeof t;
           return (

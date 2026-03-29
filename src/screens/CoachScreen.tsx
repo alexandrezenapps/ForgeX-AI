@@ -14,6 +14,10 @@ interface CoachScreenProps {
 
 export const CoachScreen: React.FC<CoachScreenProps> = ({ user }) => {
   const t = useI18n(user.language || 'en');
+  const currentProfile = React.useMemo(() => {
+    return user.equipmentProfiles?.find(p => p.id === user.currentProfileId);
+  }, [user.equipmentProfiles, user.currentProfileId]);
+
   const [messages, setMessages] = React.useState<Message[]>([
     { 
       role: 'model', 
@@ -43,17 +47,17 @@ export const CoachScreen: React.FC<CoachScreenProps> = ({ user }) => {
     setIsLoading(true);
 
     // Equipment check logic
-    const planKeywords = ['plan', 'program', 'routine', 'workout', 'schedule', 'programme', 'entraînement', '计划', '方案', '安排', '训练'];
-    const equipmentKeywords = ['equipment', 'dumbbell', 'barbell', 'gym', 'machine', 'bench', 'rack', 'band', 'kettlebell', 'équipement', 'haltère', 'barre', 'salle', 'banc', 'élastique', '器械', '哑铃', '杠铃', '健身房', '机器', '凳子', '弹力带'];
+    const planKeywords = ['plan', 'program', 'routine', 'workout', 'schedule', 'programme', 'entraînement', '计划', '方案', '安排', '训练', 'session', 'circuit', 'yoga', 'pilates'];
+    const equipmentKeywords = ['equipment', 'dumbbell', 'barbell', 'gym', 'machine', 'bench', 'rack', 'band', 'kettlebell', 'équipement', 'haltère', 'barre', 'salle', 'banc', 'élastique', '器械', '哑铃', '杠铃', '健身房', '机器', '凳子', '弹力带', 'bodyweight', 'poids du corps', '自重', 'home', 'maison', '家'];
     
     const isAskingForPlan = planKeywords.some(k => textToSend.toLowerCase().includes(k));
     const mentionsEquipment = equipmentKeywords.some(k => textToSend.toLowerCase().includes(k));
 
-    if (isAskingForPlan && !mentionsEquipment) {
+    if (isAskingForPlan && !mentionsEquipment && !currentProfile) {
       setTimeout(() => {
         setMessages((prev) => [...prev, { role: 'model', text: t.equipmentPrompt }]);
         setIsLoading(false);
-      }, 1000);
+      }, 800);
       return;
     }
 
@@ -64,22 +68,23 @@ export const CoachScreen: React.FC<CoachScreenProps> = ({ user }) => {
         contents: [
           { role: 'user', parts: [{ text: `User Profile:
 Name: ${user.name}
-Age: ${user.age}
-Weight: ${user.weight}kg
-Height: ${user.height}cm
 Goal: ${user.goal}
 Level: ${user.level}
-Equipment: Not specified (Ask user if needed for the plan)
 Language: ${user.language || 'en'}
+Current Equipment Profile: ${currentProfile ? `${currentProfile.name} (${currentProfile.equipment.join(', ')})` : 'No specific profile selected'}
 
-You are ForgeX AI, a premium fitness coach. Be concise, technical, and motivating. Use markdown for lists and emphasis. 
-If the user asks for a training plan, generate a structured 7-day plan including exercises, sets, reps, and rest periods.
-If you don't know the user's available equipment, ask them before or while providing the plan.
-IMPORTANT: Respond in the user's language (${user.language || 'en'}).
 User message: ${textToSend}` }] }
         ],
         config: {
-          systemInstruction: "You are ForgeX AI, a high-performance fitness coach. Your tone is professional, scientific, and highly motivating. You provide actionable advice on training, nutrition, and recovery. Keep responses concise and formatted with markdown. When generating plans, ensure they are realistic and progressive."
+          systemInstruction: `You are ForgeX AI, a high-performance fitness coach. Your tone is professional, scientific, and highly motivating. You provide actionable advice on training, nutrition, and recovery. 
+
+CRITICAL RULES:
+1. BE CONCISE. Avoid fluff. Get straight to the point.
+2. BE MOTIVATIONAL. Use strong, encouraging language.
+3. USE MARKDOWN. Use bolding for emphasis, bullet points for lists, and headers for structure.
+4. If the user asks for a training plan, generate a structured plan including exercises, sets, reps, and rest periods.
+5. If you don't know the user's available equipment, ask them before or while providing the plan.
+6. Respond in the user's language (${user.language || 'en'}).`
         }
       });
 

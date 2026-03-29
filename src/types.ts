@@ -1,6 +1,29 @@
-export type Goal = 'Strength' | 'Hypertrophy' | 'Endurance' | 'Fat Loss';
+export type Goal = 'Strength' | 'Hypertrophy' | 'Endurance' | 'Fat Loss' | 'Yoga' | 'Pilates';
 
 export type Language = 'en' | 'fr' | 'zh';
+
+export type MuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Core';
+
+export interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  type: 'workouts' | 'pr' | 'streak' | 'points';
+  target: number;
+  current: number;
+  rewardPoints: number;
+  rewardBadgeId?: string;
+  expiresAt: string; // ISO date string
+  completed: boolean;
+  claimed: boolean;
+}
+
+export interface EquipmentProfile {
+  id: string;
+  name: string;
+  equipment: string[];
+  icon?: string;
+}
 
 export interface UserProfile {
   id?: string;
@@ -20,6 +43,12 @@ export interface UserProfile {
   secondaryColor?: string;
   language?: Language;
   exerciseVideoOverrides?: Record<string, string>;
+  challenges?: Challenge[];
+  badges?: Badge[];
+  equipmentProfiles?: EquipmentProfile[];
+  currentProfileId?: string;
+  muscleFatigue?: Record<string, number>; // 0 to 100, keys are MuscleGroup
+  lastFatigueUpdate?: string; // ISO date string
 }
 
 export interface LeaderboardEntry {
@@ -51,6 +80,7 @@ export interface WorkoutSession {
   exercises: {
     exerciseId: string;
     restTime?: number; // in seconds
+    supersetWith?: string; // exerciseId of the next exercise in the superset
     sets: {
       reps: number;
       weight: number;
@@ -79,6 +109,7 @@ export interface WorkoutTemplate {
   exercises: {
     exerciseId: string;
     restTime?: number; // in seconds
+    supersetWith?: string; // exerciseId of the next exercise in the superset
     sets: {
       reps: number;
       weight: number;

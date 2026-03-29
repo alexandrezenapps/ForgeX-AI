@@ -8,6 +8,7 @@ import { ProgressionScreen } from './screens/ProgressionScreen';
 import { BadgesScreen } from './screens/BadgesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { VideoScreen } from './screens/VideoScreen';
+import { MusicScreen } from './screens/MusicScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { FloatingActionMenu } from './components/FloatingActionMenu';
 import { Auth } from './components/Auth';
@@ -116,6 +117,9 @@ export default function App() {
       case 'workout':
         setActiveScreen('workout');
         break;
+      case 'music':
+        setActiveScreen('music');
+        break;
       case 'coach':
         setActiveScreen('coach');
         break;
@@ -140,7 +144,7 @@ export default function App() {
   const renderScreen = () => {
     switch (activeScreen) {
       case 'home':
-        return <HomeScreen user={user} onStartWorkout={() => setActiveScreen('workout')} />;
+        return <HomeScreen user={user} onStartWorkout={() => setActiveScreen('workout')} onUpdateUser={handleUpdateUser} />;
       case 'workout':
         return <WorkoutScreen user={user} onUpdateUser={handleUpdateUser} />;
       case 'coach':
@@ -151,10 +155,12 @@ export default function App() {
         return <BadgesScreen user={user} />;
       case 'video':
         return <VideoScreen user={user} />;
+      case 'music':
+        return <MusicScreen user={user} />;
       case 'settings':
         return <SettingsScreen user={user} onUpdateUser={handleUpdateUser} />;
       default:
-        return <HomeScreen user={user} onStartWorkout={() => setActiveScreen('workout')} />;
+        return <HomeScreen user={user} onStartWorkout={() => setActiveScreen('workout')} onUpdateUser={handleUpdateUser} />;
     }
   };
 

@@ -21,6 +21,7 @@ import { UserProfile, WorkoutSession, LeaderboardEntry } from '../types';
 import { useI18n } from '../i18n';
 import { WORKOUT_HISTORY, EXERCISES, LEADERBOARD_DATA } from '../constants';
 import { Button } from '../components/Button';
+import { RecoveryMap } from '../components/RecoveryMap';
 import { motion, AnimatePresence } from 'motion/react';
 
 const data = [
@@ -37,6 +38,46 @@ export const ProgressionScreen: React.FC<{ user: UserProfile }> = ({ user }) => 
   const t = useI18n(user.language || 'en');
   const [selectedSession, setSelectedSession] = React.useState<WorkoutSession | null>(null);
   const [activeTab, setActiveTab] = React.useState<'analytics' | 'leaderboard'>('analytics');
+  const [selectedExerciseId, setSelectedExerciseId] = React.useState<string | null>(null);
+
+  // Get all exercises that have been performed in history
+  const performedExerciseIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    WORKOUT_HISTORY.forEach(session => {
+      session.exercises.forEach(ex => ids.add(ex.exerciseId));
+    });
+    return Array.from(ids);
+  }, []);
+
+  // Set initial selected exercise
+  React.useEffect(() => {
+    if (performedExerciseIds.length > 0 && !selectedExerciseId) {
+      setSelectedExerciseId(performedExerciseIds[0]);
+    }
+  }, [performedExerciseIds, selectedExerciseId]);
+
+  // Calculate progress data for selected exercise
+  const exerciseProgressData = React.useMemo(() => {
+    if (!selectedExerciseId) return [];
+
+    return WORKOUT_HISTORY
+      .filter(session => session.exercises.some(ex => ex.exerciseId === selectedExerciseId))
+      .map(session => {
+        const exercise = session.exercises.find(ex => ex.exerciseId === selectedExerciseId)!;
+        const maxWeight = Math.max(...exercise.sets.map(s => s.weight));
+        const maxReps = Math.max(...exercise.sets.map(s => s.reps));
+        const volume = exercise.sets.reduce((acc, s) => acc + (s.weight * s.reps), 0);
+        
+        return {
+          date: new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          fullDate: session.date,
+          maxWeight,
+          maxReps,
+          volume,
+        };
+      })
+      .sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime());
+  }, [selectedExerciseId]);
 
   const radarData = [
     { subject: t.strength, A: 120, fullMark: 150 },
@@ -143,6 +184,176 @@ export const ProgressionScreen: React.FC<{ user: UserProfile }> = ({ user }) => 
                 </ResponsiveContainer>
               </div>
             </Card>
+
+            {/* Recovery Map */}
+            <RecoveryMap user={user} />
+
+            {/* Exercise Progress Charts */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-xs font-mono uppercase tracking-widest text-white/50">{t.exerciseProgress}</h3>
+              </div>
+              
+              <Card className="p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex flex-wrap gap-2">
+                    {performedExerciseIds.map(id => {
+                      const exercise = EXERCISES.find(ex => ex.id === id);
+                      if (!exercise) return null;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setSelectedExerciseId(id)}
+                          className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border ${
+                            selectedExerciseId === id 
+                              ? 'bg-accent text-bg border-accent shadow-lg shadow-accent/20' 
+                              : 'bg-white/5 text-white/40 border-white/10 hover:border-white/30'
+                          }`}
+                        >
+                          {exercise.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {selectedExerciseId && exerciseProgressData.length > 0 ? (
+                  <div className="space-y-8">
+                    {/* Max Weight Chart */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">{t.maxWeight} (kg)</span>
+                        <span className="text-lg font-black font-mono text-accent">
+                          {exerciseProgressData[exerciseProgressData.length - 1].maxWeight}kg
+                        </span>
+                      </div>
+                      <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={exerciseProgressData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis 
+                              dataKey="date" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 8, fontFamily: 'monospace' }} 
+                            />
+                            <YAxis 
+                              hide 
+                              domain={['dataMin - 5', 'dataMax + 5']}
+                            />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'rgba(5,5,5,0.9)', 
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '12px',
+                                fontSize: '10px'
+                              }} 
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="maxWeight" 
+                              stroke="var(--color-accent)" 
+                              strokeWidth={3}
+                              dot={{ r: 4, fill: 'var(--color-accent)', strokeWidth: 0 }}
+                              activeDot={{ r: 6, fill: 'var(--color-accent)', stroke: 'white', strokeWidth: 2 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Max Reps Chart */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">{t.maxReps}</span>
+                        <span className="text-lg font-black font-mono text-white">
+                          {exerciseProgressData[exerciseProgressData.length - 1].maxReps}
+                        </span>
+                      </div>
+                      <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={exerciseProgressData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis 
+                              dataKey="date" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 8, fontFamily: 'monospace' }} 
+                            />
+                            <YAxis hide />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'rgba(5,5,5,0.9)', 
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '12px',
+                                fontSize: '10px'
+                              }} 
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="maxReps" 
+                              stroke="rgba(255,255,255,0.5)" 
+                              strokeWidth={2}
+                              dot={{ r: 3, fill: 'rgba(255,255,255,0.5)', strokeWidth: 0 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Volume Chart */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">{t.totalVolume} (kg)</span>
+                        <span className="text-lg font-black font-mono text-accent-secondary">
+                          {exerciseProgressData[exerciseProgressData.length - 1].volume}kg
+                        </span>
+                      </div>
+                      <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={exerciseProgressData}>
+                            <defs>
+                              <linearGradient id="colorVolumeExercise" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="var(--color-accent-secondary)" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="var(--color-accent-secondary)" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis 
+                              dataKey="date" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 8, fontFamily: 'monospace' }} 
+                            />
+                            <YAxis hide />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'rgba(5,5,5,0.9)', 
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '12px',
+                                fontSize: '10px'
+                              }} 
+                            />
+                            <Area 
+                              type="monotone" 
+                              dataKey="volume" 
+                              stroke="var(--color-accent-secondary)" 
+                              strokeWidth={2}
+                              fillOpacity={1} 
+                              fill="url(#colorVolumeExercise)" 
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-48 flex items-center justify-center text-white/20 text-xs uppercase tracking-widest font-mono">
+                    {t.noDataAvailable}
+                  </div>
+                )}
+              </Card>
+            </div>
 
             {/* Radar Chart & Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -2,18 +2,90 @@ import * as React from 'react';
 import { Card } from '../components/Card';
 import { Gauge } from '../components/Gauge';
 import { Button } from '../components/Button';
-import { UserProfile } from '../types';
-import { Flame, Zap, Trophy, Clock, Activity, Moon, TrendingUp } from 'lucide-react';
-import { motion } from 'motion/react';
+import { UserProfile, Challenge, Badge } from '../types';
+import { Flame, Zap, Trophy, Clock, Activity, Moon, TrendingUp, Star, CheckCircle2, Gift } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '../i18n';
+import { cn } from '../lib/utils';
+import { BADGES } from '../constants';
+import { RecoveryMap } from '../components/RecoveryMap';
 
 interface HomeScreenProps {
   user: UserProfile;
   onStartWorkout: () => void;
+  onUpdateUser: (user: UserProfile) => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ user, onStartWorkout }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ user, onStartWorkout, onUpdateUser }) => {
   const t = useI18n(user.language || 'en');
+
+  // Initialize challenges and badges if they don't exist
+  React.useEffect(() => {
+    const updates: Partial<UserProfile> = {};
+    
+    if (!user.challenges || user.challenges.length === 0) {
+      updates.challenges = [
+        {
+          id: 'c1',
+          title: t.weeklyChallenges,
+          description: t.completeWorkouts.replace('{target}', '5'),
+          type: 'workouts',
+          target: 5,
+          current: 2,
+          rewardPoints: 500,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          completed: false,
+          claimed: false
+        },
+        {
+          id: 'c2',
+          title: t.weeklyChallenges,
+          description: t.hitPr.replace('{exercise}', 'Deadlifts'),
+          type: 'pr',
+          target: 1,
+          current: 0,
+          rewardPoints: 1000,
+          rewardBadgeId: '7',
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          completed: false,
+          claimed: false
+        }
+      ];
+    }
+
+    if (!user.badges || user.badges.length === 0) {
+      updates.badges = BADGES;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      onUpdateUser({ ...user, ...updates });
+    }
+  }, []);
+
+  const handleClaimReward = (challengeId: string) => {
+    const challenge = user.challenges?.find(c => c.id === challengeId);
+    if (!challenge || !challenge.completed || challenge.claimed) return;
+
+    const updatedChallenges = user.challenges?.map(c => 
+      c.id === challengeId ? { ...c, claimed: true } : c
+    );
+
+    let updatedBadges = user.badges;
+    if (challenge.rewardBadgeId) {
+      updatedBadges = user.badges?.map(b => 
+        b.id === challenge.rewardBadgeId ? { ...b, unlocked: true } : b
+      );
+    }
+
+    onUpdateUser({
+      ...user,
+      points: (user.points || 0) + challenge.rewardPoints,
+      xp: user.xp + (challenge.rewardPoints / 10), // 10% of points as XP
+      challenges: updatedChallenges,
+      badges: updatedBadges
+    });
+  };
+
   return (
     <div className="p-6 space-y-6 pb-32">
       {/* XP & Level Section */}
@@ -32,6 +104,91 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ user, onStartWorkout }) 
         </div>
         <Gauge value={user.energy} max={100} label={t.energy} color="var(--color-accent-secondary)" />
       </Card>
+
+      {/* Recovery Map Section */}
+      <RecoveryMap user={user} />
+
+      {/* Weekly Challenges */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-xs font-mono uppercase tracking-widest text-white/50">{t.weeklyChallenges}</h3>
+          <Star className="w-4 h-4 text-accent animate-pulse" />
+        </div>
+        <div className="space-y-3">
+          <AnimatePresence>
+            {user.challenges?.map((challenge) => {
+              const progress = (challenge.current / challenge.target) * 100;
+              const daysLeft = Math.ceil((new Date(challenge.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              
+              return (
+                <motion.div
+                  key={challenge.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                >
+                  <Card className={cn(
+                    "relative overflow-hidden transition-all duration-500",
+                    challenge.completed && !challenge.claimed && "border-accent/50 bg-accent/5 shadow-neon-small"
+                  )}>
+                    <div className="p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold uppercase tracking-tight">{challenge.description}</h4>
+                          <p className="text-[10px] text-white/40 uppercase tracking-widest">
+                            {t.expiresIn.replace('{days}', daysLeft.toString())}
+                          </p>
+                        </div>
+                        {challenge.completed ? (
+                          <CheckCircle2 className="w-5 h-5 text-accent" />
+                        ) : (
+                          <div className="text-[10px] font-mono text-accent">
+                            {challenge.current}/{challenge.target}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-accent"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(progress, 100)}%` }}
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <Gift className="w-3 h-3 text-accent-secondary" />
+                          <span className="text-[10px] font-bold text-accent-secondary uppercase tracking-widest">
+                            +{challenge.rewardPoints} {t.points}
+                          </span>
+                        </div>
+                        
+                        {challenge.completed && !challenge.claimed && (
+                          <Button 
+                            variant="neon" 
+                            size="sm" 
+                            className="h-7 text-[10px] px-4"
+                            onClick={() => handleClaimReward(challenge.id)}
+                          >
+                            {t.claimReward}
+                          </Button>
+                        )}
+                        
+                        {challenge.claimed && (
+                          <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest italic">
+                            {t.claimed}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4">
@@ -77,8 +234,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ user, onStartWorkout }) 
             </div>
             <div>
               <h4 className="text-xs font-bold uppercase tracking-widest text-white/40">{t.recoveryHud}</h4>
-              <p className="text-sm font-bold">{t.cnsReadiness}: 92%</p>
-              <p className="text-[10px] text-accent uppercase tracking-tighter">{t.optimalHeavy}</p>
+              <p className="text-sm font-bold">{t.cnsReadiness || 'CNS Readiness'}: 92%</p>
+              <p className="text-[10px] text-accent uppercase tracking-tighter">{t.optimalHeavy || 'Optimal for Heavy Loads'}</p>
             </div>
           </div>
           <div className="flex -space-x-2">
@@ -94,7 +251,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ user, onStartWorkout }) 
             </div>
             <div>
               <h4 className="text-xs font-bold uppercase tracking-widest text-white/40">{t.sleepLab}</h4>
-              <p className="text-sm font-bold">{t.score}: 84/100</p>
+              <p className="text-sm font-bold">{t.score || 'Score'}: 84/100</p>
               <p className="text-[10px] text-accent-secondary uppercase tracking-tighter">7h 24m • 2h {t.deepSleep}</p>
             </div>
           </div>
@@ -113,7 +270,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ user, onStartWorkout }) 
                   <Dumbbell className="w-5 h-5 text-white/40" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold">{t.pushSession} A</h4>
+                  <h4 className="text-sm font-bold">{t.pushSession || 'Push Session'} A</h4>
                   <p className="text-[10px] text-white/40 uppercase tracking-tighter">March {28 - i}, 2026 • 52m</p>
                 </div>
               </div>

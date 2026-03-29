@@ -1,11 +1,11 @@
 import * as React from 'react';
-import { Home, Dumbbell, MessageSquare, TrendingUp, Award, Settings, Video } from 'lucide-react';
+import { Home, Dumbbell, MessageSquare, TrendingUp, Award, Settings, Video, Music } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 import { Language } from '../types';
 import { useI18n } from '../i18n';
 
-export type Screen = 'home' | 'workout' | 'coach' | 'progression' | 'badges' | 'settings' | 'video';
+export type Screen = 'home' | 'workout' | 'coach' | 'progression' | 'badges' | 'settings' | 'video' | 'music';
 
 interface BottomNavProps {
   activeScreen: Screen;
@@ -18,7 +18,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeScreen, setActiveScr
   const navItems = [
     { id: 'home', icon: Home, label: t.home },
     { id: 'workout', icon: Dumbbell, label: t.workout },
-    { id: 'video', icon: Video, label: 'Video' },
+    { id: 'music', icon: Music, label: t.music },
     { id: 'coach', icon: MessageSquare, label: t.coach },
     { id: 'progression', icon: TrendingUp, label: 'Stats' },
   ] as const;

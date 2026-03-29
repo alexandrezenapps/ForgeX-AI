@@ -1,4 +1,19 @@
-import { Exercise, Badge, WorkoutSession, LeaderboardEntry } from './types';
+import { Exercise, Badge, WorkoutSession, LeaderboardEntry, WorkoutTemplate } from './types';
+
+export const ALL_EQUIPMENT = [
+  'Barbell',
+  'Dumbbells',
+  'Kettlebell',
+  'Bench',
+  'Squat Rack',
+  'Pull-up Bar',
+  'Resistance Bands',
+  'Cable Machine',
+  'Bodyweight',
+  'Yoga Mat',
+  'Pilates Ball',
+  'Pilates Ring',
+];
 
 export const EXERCISES: Exercise[] = [
   {
@@ -180,6 +195,126 @@ export const EXERCISES: Exercise[] = [
       'Keep your back straight.'
     ],
     videoUrl: 'https://www.youtube.com/embed/NeAtimSCasY'
+  },
+  {
+    id: '13',
+    name: 'Downward-Facing Dog',
+    category: 'Yoga',
+    equipment: ['Bodyweight', 'Yoga Mat'],
+    difficulty: 'Beginner',
+    description: 'A foundational yoga pose that stretches the entire body.',
+    cues: [
+      'Spread your fingers wide.',
+      'Push your hips up and back.',
+      'Keep your back flat.',
+      'Pedal your feet to stretch your calves.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/j97UX0646qw'
+  },
+  {
+    id: '14',
+    name: 'Warrior I',
+    category: 'Yoga',
+    equipment: ['Bodyweight'],
+    difficulty: 'Beginner',
+    description: 'A standing pose that builds strength and focus.',
+    cues: [
+      'Step one foot forward into a lunge.',
+      'Keep your back foot at a 45-degree angle.',
+      'Reach your arms overhead.',
+      'Square your hips to the front.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/o_I9vYvY_3U'
+  },
+  {
+    id: '15',
+    name: 'Cobra Pose',
+    category: 'Yoga',
+    equipment: ['Bodyweight'],
+    difficulty: 'Beginner',
+    description: 'A back-bending pose that opens the chest and strengthens the spine.',
+    cues: [
+      'Lie on your stomach with hands under shoulders.',
+      'Gently lift your chest off the floor.',
+      'Keep your elbows close to your sides.',
+      'Gaze slightly upward.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/fOdrW7nfLfE'
+  },
+  {
+    id: '16',
+    name: 'Tree Pose',
+    category: 'Yoga',
+    equipment: ['Bodyweight'],
+    difficulty: 'Intermediate',
+    description: 'A balancing pose that improves focus and stability.',
+    cues: [
+      'Stand on one leg.',
+      'Place the sole of your other foot on your inner thigh or calf.',
+      'Bring your hands to your heart center.',
+      'Find a steady point to gaze at.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/wdln9qWYloU'
+  },
+  {
+    id: '17',
+    name: 'The Hundred',
+    category: 'Pilates',
+    equipment: ['Bodyweight', 'Yoga Mat'],
+    difficulty: 'Intermediate',
+    description: 'A classic Pilates exercise that builds core strength and improves circulation.',
+    cues: [
+      'Lie on your back with legs in tabletop position.',
+      'Lift your head and shoulders off the mat.',
+      'Pump your arms up and down vigorously.',
+      'Inhale for 5 counts, exhale for 5 counts.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/3v_70U9m5E0'
+  },
+  {
+    id: '18',
+    name: 'Pilates Roll Up',
+    category: 'Pilates',
+    equipment: ['Bodyweight'],
+    difficulty: 'Intermediate',
+    description: 'A core-strengthening exercise that improves spinal flexibility.',
+    cues: [
+      'Lie flat on your back with arms overhead.',
+      'Slowly roll up, reaching for your toes.',
+      'Keep your core engaged and spine curved.',
+      'Roll back down with control, one vertebra at a time.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/u-vS9n_2OqY'
+  },
+  {
+    id: '19',
+    name: 'Single Leg Stretch',
+    category: 'Pilates',
+    equipment: ['Bodyweight'],
+    difficulty: 'Beginner',
+    description: 'A core exercise that targets the abdominals and improves coordination.',
+    cues: [
+      'Lie on your back with knees in tabletop.',
+      'Lift your head and shoulders.',
+      'Extend one leg out while pulling the other knee in.',
+      'Switch legs with control, keeping your lower back pressed to the mat.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/6_rD8D8Z5pY'
+  },
+  {
+    id: '20',
+    name: 'Pilates Saw',
+    category: 'Pilates',
+    equipment: ['Bodyweight'],
+    difficulty: 'Beginner',
+    description: 'A rotational exercise that improves spinal mobility and stretches the hamstrings.',
+    cues: [
+      'Sit with legs wide and arms extended to the sides.',
+      'Twist your torso and reach for the opposite foot.',
+      'Keep your hips grounded.',
+      'Return to center and repeat on the other side.'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/Pj1e9pW9-Y8'
   }
 ];
 
@@ -224,6 +359,13 @@ export const BADGES: Badge[] = [
     name: 'Volume Warrior',
     description: 'Lift a total of 50,000 lbs in a single week.',
     icon: 'Trophy',
+    unlocked: false
+  },
+  {
+    id: '7',
+    name: 'Challenge Master',
+    description: 'Complete 5 weekly challenges.',
+    icon: 'Star',
     unlocked: false
   }
 ];
@@ -287,6 +429,62 @@ export const WORKOUT_HISTORY: WorkoutSession[] = [
           { reps: 8, weight: 100, completed: true },
           { reps: 8, weight: 100, completed: true },
           { reps: 6, weight: 100, completed: true },
+        ]
+      }
+    ]
+  }
+];
+
+export const DEFAULT_TEMPLATES: WorkoutTemplate[] = [
+  {
+    id: 'dt1',
+    name: 'Neural Chest & Back (Superset)',
+    exercises: [
+      {
+        exerciseId: '1', // Bench Press
+        supersetWith: '6', // Pull-ups
+        sets: [
+          { reps: 10, weight: 60 },
+          { reps: 10, weight: 60 },
+          { reps: 10, weight: 60 },
+        ]
+      },
+      {
+        exerciseId: '6', // Pull-ups
+        sets: [
+          { reps: 8, weight: 0 },
+          { reps: 8, weight: 0 },
+          { reps: 8, weight: 0 },
+        ]
+      },
+      {
+        exerciseId: '5', // Pushups
+        sets: [
+          { reps: 15, weight: 0 },
+          { reps: 15, weight: 0 },
+          { reps: 15, weight: 0 },
+        ]
+      }
+    ]
+  },
+  {
+    id: 'dt2',
+    name: 'Cybernetic Leg Day',
+    exercises: [
+      {
+        exerciseId: '3', // Squat
+        sets: [
+          { reps: 10, weight: 80 },
+          { reps: 10, weight: 80 },
+          { reps: 10, weight: 80 },
+        ]
+      },
+      {
+        exerciseId: '10', // Romanian Deadlift
+        sets: [
+          { reps: 12, weight: 60 },
+          { reps: 12, weight: 60 },
+          { reps: 12, weight: 60 },
         ]
       }
     ]

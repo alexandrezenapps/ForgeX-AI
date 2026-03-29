@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, Dumbbell, Sparkles, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Zap, Dumbbell, Sparkles, Settings, ChevronLeft, ChevronRight, Music } from 'lucide-react';
 import { Button } from './Button';
 import { useI18n } from '../i18n';
 import { Language } from '../types';
@@ -70,6 +70,15 @@ export const FloatingActionMenu: React.FC<FloatingActionMenuProps> = ({ onAction
                     <Dumbbell className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">{t.quickStart}</span>
+                </button>
+                <button
+                  onClick={() => onAction('music')}
+                  className="flex items-center gap-3 p-3 hover:bg-accent/10 rounded-xl transition-colors group text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center group-hover:bg-accent group-hover:text-bg transition-colors">
+                    <Music className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">{t.music}</span>
                 </button>
                 <button
                   onClick={() => onAction('coach')}
