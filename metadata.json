@@ -1,0 +1,9 @@
+{
+  "name": "ForgeX AI",
+  "description": "A premium, high-tech fitness app with AI coaching, progression tracking, and gamification.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
